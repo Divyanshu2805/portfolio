@@ -1,0 +1,156 @@
+"""
+Generates src/data/quote-traces.ts: each Contact quote as the outline of its
+letters in JetBrains Mono, resampled to a fixed number of points, so the
+oscilloscope trace can bend itself into the words (see scope-trace.tsx).
+
+Run after changing contact.quotes in src/data/resume.tsx, with the dev server
+having run once (it caches the font under .next):
+
+    pip install fonttools brotli
+    python scripts/quote-traces.py
+"""
+
+import glob
+import json
+import math
+import re
+from pathlib import Path
+
+from fontTools.pens.recordingPen import DecomposingRecordingPen
+from fontTools.ttLib import TTFont
+from fontTools.varLib.instancer import instantiateVariableFont
+
+ROOT = Path(__file__).resolve().parent.parent
+N = 1200  # points per quote
+SCALE = 150  # stored units per em (x must stay under 4096 / SCALE em)
+FAMILY = "JetBrains Mono"
+TRACKING = 0.0  # em
+ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+
+
+def load_font():
+    for f in glob.glob(str(ROOT / ".next/**/media/*.woff2"), recursive=True):
+        t = TTFont(f)
+        cmap = t.getBestCmap()
+        if FAMILY in (t["name"].getDebugName(1) or "") and ord("a") in cmap and ord("–") in cmap:
+            return instantiateVariableFont(t, {"wght": 500})
+    raise SystemExit(f"{FAMILY} latin font not found under .next; run `npm run dev` once.")
+
+
+def flatten(ops):
+    """Pen operations to closed polylines (lists of (x, y) in font units)."""
+    contours, cur, pos = [], [], (0, 0)
+
+    def sample(p0, cps, p3):
+        pts = [p0, *cps, p3]
+        steps = 12
+        for s in range(1, steps + 1):
+            t = s / steps
+            q = pts
+            while len(q) > 1:
+                q = [((1 - t) * a[0] + t * b[0], (1 - t) * a[1] + t * b[1]) for a, b in zip(q, q[1:])]
+            cur.append(q[0])
+
+    for op, args in ops:
+        if op == "moveTo":
+            cur = [args[0]]
+            pos = args[0]
+        elif op == "lineTo":
+            cur.append(args[0])
+            pos = args[0]
+        elif op == "curveTo":
+            sample(pos, args[:-1], args[-1])
+            pos = args[-1]
+        elif op == "qCurveTo":
+            # TrueType implied on-curve points between consecutive off-curve points.
+            offs, end = list(args[:-1]), args[-1]
+            for i, c in enumerate(offs):
+                nxt = end if i == len(offs) - 1 else ((c[0] + offs[i + 1][0]) / 2, (c[1] + offs[i + 1][1]) / 2)
+                sample(pos, [c], nxt)
+                pos = nxt
+        elif op in ("closePath", "endPath"):
+            if len(cur) > 2:
+                if cur[0] != cur[-1]:
+                    cur.append(cur[0])
+                contours.append(cur)
+            cur = []
+    return contours
+
+
+def length(poly):
+    return sum(math.dist(a, b) for a, b in zip(poly, poly[1:]))
+
+
+def resample(poly, n):
+    total = length(poly)
+    out, seg, acc = [], 0, 0.0
+    for k in range(n):
+        target = total * k / n
+        while seg < len(poly) - 2 and acc + math.dist(poly[seg], poly[seg + 1]) < target:
+            acc += math.dist(poly[seg], poly[seg + 1])
+            seg += 1
+        a, b = poly[seg], poly[seg + 1]
+        d = math.dist(a, b) or 1
+        t = min(1, max(0, (target - acc) / d))
+        out.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
+    return out
+
+
+def trace(font, text):
+    upem = font["head"].unitsPerEm
+    cmap, glyphs, hmtx = font.getBestCmap(), font.getGlyphSet(), font["hmtx"]
+    x, contours = 0.0, []
+    for ch in text:
+        name = cmap[ord(ch)]
+        pen = DecomposingRecordingPen(glyphs)
+        glyphs[name].draw(pen)
+        polys = [[((px + x) / upem, py / upem) for px, py in c] for c in flatten(pen.value)]
+        polys.sort(key=lambda c: min(p[0] for p in c))
+        for c in polys:
+            # Start each contour at its lowest-left point so the wave enters it from below.
+            i = min(range(len(c) - 1), key=lambda j: c[j][1] * 2 + c[j][0])
+            c = c[i:-1] + c[: i + 1]
+            contours.append(c)
+        x += hmtx[name][0] + TRACKING * upem
+    adv = x / upem - TRACKING
+    total = sum(length(c) for c in contours)
+    counts = [max(4, round(N * length(c) / total)) for c in contours]
+    counts[max(range(len(counts)), key=lambda i: counts[i])] += N - sum(counts)
+    pts, breaks = [], []
+    for c, n in zip(contours, counts):
+        if pts:
+            breaks.append(len(pts))
+        pts.extend(resample(c, n))
+    enc = ""
+    for px, py in pts:
+        for v in (round(px * SCALE), round(py * SCALE) + 100):
+            v = max(0, min(4095, v))
+            enc += ALPHABET[v >> 6] + ALPHABET[v & 63]
+    cap = font["OS/2"].sCapHeight / upem
+    return adv, cap, enc, breaks
+
+
+def main():
+    src = (ROOT / "src/data/resume.tsx").read_text(encoding="utf-8")
+    start = src.index("quotes: [")
+    block = src[start : src.index("] as", start)]
+    quotes = re.findall(r'text: "([^"]+)"', block)
+    font = load_font()
+    lines = [
+        "// Generated by scripts/quote-traces.py from contact.quotes; do not edit.",
+        "// Each quote's letter outlines in JetBrains Mono, resampled for ScopeTrace.",
+        "",
+        "export type QuoteTrace = { adv: number; cap: number; pts: string; breaks: number[] };",
+        "",
+        "export const QUOTE_TRACES: Record<string, QuoteTrace> = {",
+    ]
+    for q in quotes:
+        adv, cap, enc, breaks = trace(font, q)
+        lines.append(f'  {json.dumps(q, ensure_ascii=False)}: {{ adv: {adv:.4f}, cap: {cap:.4f}, breaks: {json.dumps(breaks)}, pts: "{enc}" }},')
+    lines.append("};")
+    (ROOT / "src/data/quote-traces.ts").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"wrote {len(quotes)} traces")
+
+
+if __name__ == "__main__":
+    main()
