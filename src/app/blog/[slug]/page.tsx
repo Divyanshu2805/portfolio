@@ -1,195 +1,93 @@
-import { allPosts } from "content-collections";
-import { formatDate } from "@/lib/utils";
+import { mdxComponents } from "@/components/blog/mdx";
+import { Footer } from "@/components/sections/footer";
 import { DATA } from "@/data/resume";
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { SITE_URL } from "@/lib/site";
+import { formatPostDate, getPost, posts } from "@/lib/posts";
 import { MDXContent } from "@content-collections/mdx/react";
-import { mdxComponents } from "@/mdx-components";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { notFound } from "next/navigation";
 
-function getSortedPosts() {
-  return [...allPosts].sort((a, b) => {
-    if (new Date(a.publishedAt) > new Date(b.publishedAt)) {
-      return -1;
-    }
-    return 1;
-  });
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return posts.map((p) => ({ slug: p.slug }));
 }
 
-export async function generateStaticParams() {
-  return allPosts.map((post) => ({
-    slug: post._meta.path.replace(/\.mdx$/, ""),
-  }));
-}
-
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{
-    slug: string;
-  }>;
-}): Promise<Metadata | undefined> {
-  const { slug } = await params;
-  const post = allPosts.find((p) => p._meta.path.replace(/\.mdx$/, "") === slug);
-
-  if (!post) {
-    return undefined;
-  }
-
-  let {
-    title,
-    publishedAt: publishedTime,
-    summary: description,
-    image,
-  } = post;
-
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const post = getPost((await params).slug);
+  if (!post) return {};
   return {
-    title,
-    description,
-    openGraph: {
-      title,
-      description,
-      type: "article",
-      publishedTime,
-      url: `/blog/${slug}`,
-      ...(image && {
-        images: [
-          {
-            url: `${DATA.url}${image}`,
-          },
-        ],
-      }),
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      ...(image && {
-        images: [`${DATA.url}${image}`],
-      }),
-    },
+    title: post.title,
+    description: post.summary,
+    openGraph: { type: "article", title: post.title, description: post.summary, publishedTime: post.date },
   };
 }
 
-export default async function Blog({
-  params,
-}: {
-  params: Promise<{
-    slug: string;
-  }>;
-}) {
-  if (!DATA.writing.enabled) notFound();
+const UPDATED = new Date().toISOString().slice(0, 10);
 
+export default async function PostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const sortedPosts = getSortedPosts();
-  const currentIndex = sortedPosts.findIndex(
-    (p) => p._meta.path.replace(/\.mdx$/, "") === slug
-  );
-  const post = sortedPosts[currentIndex];
+  const post = getPost(slug);
+  if (!DATA.writing.enabled || !post) notFound();
 
-  if (!post) {
-    notFound();
-  }
+  const i = posts.indexOf(post);
+  const newer = posts[i - 1];
+  const older = posts[i + 1];
 
-  const previousPost = currentIndex > 0 ? sortedPosts[currentIndex - 1] : null;
-  const nextPost = currentIndex < sortedPosts.length - 1 ? sortedPosts[currentIndex + 1] : null;
-
-  const getSlug = (post: (typeof sortedPosts)[0]) =>
-    post._meta.path.replace(/\.mdx$/, "");
-
-  const jsonLdContent = JSON.stringify({
+  const jsonLd = JSON.stringify({
     "@context": "https://schema.org",
     "@type": "BlogPosting",
     headline: post.title,
-    datePublished: post.publishedAt,
-    dateModified: post.publishedAt,
     description: post.summary,
-    image: post.image
-      ? `${DATA.url}${post.image}`
-      : `${DATA.url}/blog/${slug}/opengraph-image`,
-    url: `/blog/${slug}`,
-    author: {
-      "@type": "Person",
-      name: DATA.name,
-    },
-  }).replace(/</g, "\\u003c");
+    datePublished: post.date,
+    url: `${SITE_URL}/blog/${slug}`,
+    author: { "@type": "Person", name: DATA.name },
+  }).replace(/</g, "\u003c");
 
   return (
-    <section id="blog">
-      <script
-        type="application/ld+json"
-        suppressHydrationWarning
-        dangerouslySetInnerHTML={{
-          __html: jsonLdContent,
-        }}
-      />
-      <div className="flex justify-start gap-4 items-center">
-        <Link href="/blog" className="text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg px-2 py-1 inline-flex items-center gap-1 mb-6 group" aria-label="Back to Blog">
-          <ChevronLeft className="size-3 group-hover:-translate-x-px transition-transform" />
-          Back to Blog
-        </Link>
-      </div>
-      <div className="flex flex-col gap-4">
-        <h1 className="title font-semibold text-3xl md:text-4xl tracking-tighter leading-tight">
-          {post.title}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {formatDate(post.publishedAt)}
-        </p>
-      </div>
-      <div className="my-6 flex w-full items-center">
-        <div
-          className="flex-1 h-px bg-border"
-          style={{
-            maskImage:
-              "linear-gradient(90deg, transparent, black 8%, black 92%, transparent)",
-            WebkitMaskImage:
-              "linear-gradient(90deg, transparent, black 8%, black 92%, transparent)",
-          }}
-        />
-      </div>
-      <article className="prose max-w-full text-pretty font-sans leading-relaxed text-muted-foreground dark:prose-invert">
-        <MDXContent code={post.mdx} components={mdxComponents} />
-      </article>
+    <>
+      <main id="main" data-sheet={post.title} className="pt-28 sm:pt-32">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
+        <div className="mx-auto max-w-[44rem] px-5 sm:px-8">
+          <Link href="/blog" className="group inline-flex items-center gap-2 font-mono text-[12.5px] text-fog transition-colors hover:text-ink">
+            <span className="transition-transform duration-300 group-hover:-translate-x-1">←</span> {DATA.writing.title}
+          </Link>
 
-      <nav className="mt-12 pt-8 max-w-2xl">
-        <div className="flex flex-col sm:flex-row justify-between gap-4">
-          {previousPost ? (
-            <Link
-              href={`/blog/${getSlug(previousPost)}`}
-              className="group flex-1 flex flex-col gap-1 p-4 rounded-lg border border-border hover:bg-accent/50"
-            >
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <ChevronLeft className="size-3" />
-                Previous
-              </span>
-              <span className="text-sm font-medium group-hover:text-foreground whitespace-normal wrap-break-word">
-                {previousPost.title}
-              </span>
-            </Link>
-          ) : (
-            <div className="hidden sm:block flex-1" />
-          )}
+          <header className="mt-8 grid gap-4 border-b border-line pb-8">
+            <time dateTime={post.date} className="font-mono text-[12.5px] text-acc">
+              {formatPostDate(post.date)}
+            </time>
+            <h1 className="font-display text-[clamp(2.4rem,6vw,4rem)] leading-[0.95] font-extrabold tracking-[-0.045em]">{post.title}</h1>
+            <p className="text-[clamp(1.05rem,1.8vw,1.25rem)] leading-snug tracking-tight text-fog">{post.summary}</p>
+          </header>
 
-          {nextPost ? (
-            <Link
-              href={`/blog/${getSlug(nextPost)}`}
-              className="group flex-1 flex flex-col gap-1 p-4 rounded-lg border border-border hover:bg-accent/50 text-right"
-            >
-              <span className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
-                Next
-                <ChevronRight className="size-3" />
-              </span>
-              <span className="text-sm font-medium group-hover:text-foreground whitespace-normal wrap-break-word">
-                {nextPost.title}
-              </span>
-            </Link>
-          ) : (
-            <div className="hidden sm:block flex-1" />
+          <article className="prose mt-10 max-w-none text-[16.5px] leading-relaxed dark:prose-invert prose-headings:font-display prose-headings:tracking-tight prose-a:text-acc prose-code:font-mono prose-code:before:content-none prose-code:after:content-none">
+            <MDXContent code={post.body} components={mdxComponents} />
+          </article>
+
+          {(newer || older) && (
+            <nav aria-label="More posts" className="mt-16 grid gap-3 border-t border-line pt-8 sm:grid-cols-2">
+              {[
+                { post: older, label: "← Older", align: "" },
+                { post: newer, label: "Newer →", align: "sm:text-right sm:col-start-2" },
+              ].map(({ post: p, label, align }) =>
+                p ? (
+                  <Link
+                    key={label}
+                    href={`/blog/${p.slug}`}
+                    className={`group grid gap-1 rounded-2xl border border-line bg-panel px-5 py-4 transition-colors hover:border-acc ${align}`}
+                  >
+                    <span className="font-mono text-[11.5px] text-dim">{label}</span>
+                    <span className="font-medium tracking-tight group-hover:text-acc">{p.title}</span>
+                  </Link>
+                ) : null
+              )}
+            </nav>
           )}
         </div>
-      </nav>
-    </section>
+      </main>
+      <Footer updated={UPDATED} />
+    </>
   );
 }

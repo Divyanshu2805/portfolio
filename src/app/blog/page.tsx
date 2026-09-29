@@ -1,123 +1,64 @@
-import { allPosts } from "content-collections";
-import Link from "next/link";
-import type { Metadata } from "next";
-import { paginate, normalizePage } from "@/lib/pagination";
-import { notFound } from "next/navigation";
+import { Footer } from "@/components/sections/footer";
+import { Reveal } from "@/components/site/motion-text";
 import { DATA } from "@/data/resume";
+import { formatPostDate, posts } from "@/lib/posts";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 
 export const metadata: Metadata = {
   title: DATA.writing.title,
   description: DATA.writing.description,
-  openGraph: {
-    title: DATA.writing.title,
-    description: DATA.writing.description,
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: DATA.writing.title,
-    description: DATA.writing.description,
-  },
 };
 
-const PAGE_SIZE = 5;
+const UPDATED = new Date().toISOString().slice(0, 10);
 
-export default async function BlogPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ page?: string }>;
-}) {
+export default function BlogIndex() {
   if (!DATA.writing.enabled) notFound();
 
-  const { page: pageParam } = await searchParams;
-
-  const posts = allPosts;
-  const sortedPosts = [...posts].sort((a, b) => {
-    if (new Date(a.publishedAt) > new Date(b.publishedAt)) {
-      return -1;
-    }
-    return 1;
-  });
-
-  const totalPages = Math.ceil(sortedPosts.length / PAGE_SIZE);
-  const currentPage = normalizePage(pageParam, totalPages);
-  const { items: paginatedPosts, pagination } = paginate(sortedPosts, {
-    page: currentPage,
-    pageSize: PAGE_SIZE,
-  });
-
   return (
-    <section id="blog">
-        <h1 className="text-h2 mb-2">{DATA.writing.title}</h1>
-        <p className="text-small text-graphite mb-8">{DATA.writing.description}</p>
-      
-      {paginatedPosts.length > 0 ? (
-        <>
-            <div className="flex flex-col gap-5">
-              {paginatedPosts.map((post) => {
-                const slug = post._meta.path.replace(/\.mdx$/, "");
-                return (
-                    <Link
-                      key={slug}
-                      className="flex items-start gap-x-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      href={`/blog/${slug}`}
-                    >
-                      <div className="flex flex-col gap-y-2 flex-1">
-                        <p className="tracking-tight text-lg font-medium">
-                          <span className="group-hover:text-foreground">
-                            {post.title}
-                          </span>
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {post.publishedAt}
-                        </p>
-                      </div>
-                    </Link>
-                );
-              })}
-            </div>
-          
-          {/* Pagination Controls */}
-          {pagination.totalPages > 1 && (
-              <div className="flex gap-3 flex-row items-center justify-between mt-8">
-                <div className="text-sm text-muted-foreground">
-                  Page {pagination.page} of {pagination.totalPages}
-                </div>
-                <div className="flex gap-2 sm:justify-end">
-                  {pagination.hasPreviousPage ? (
-                    <Link
-                      href={`/blog?page=${pagination.page - 1}`}
-                      className="h-8 w-fit px-2 flex items-center justify-center text-sm border border-border rounded-lg hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    >
-                      Previous
-                    </Link>
-                  ) : (
-                    <span className="h-8 w-fit px-2 flex items-center justify-center text-sm border border-border rounded-lg opacity-50 cursor-not-allowed">
-                      Previous
-                    </span>
-                  )}
-                  {pagination.hasNextPage ? (
-                    <Link
-                      href={`/blog?page=${pagination.page + 1}`}
-                      className="h-8 w-fit px-2 flex items-center justify-center text-sm border border-border rounded-lg hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    >
-                      Next
-                    </Link>
-                  ) : (
-                    <span className="h-8 w-fit px-2 flex items-center justify-center text-sm border border-border rounded-lg opacity-50 cursor-not-allowed">
-                      Next
-                    </span>
-                  )}
-                </div>
-              </div>
-                      )}
-        </>
-      ) : (
-          <div className="flex flex-col items-center justify-center py-12 px-4 border border-border rounded-xl">
-            <p className="text-muted-foreground text-center">
-              No posts yet.
+    <>
+      <main id="main" data-sheet={DATA.writing.title} className="pt-28 sm:pt-32">
+        <div className="mx-auto max-w-page px-5 sm:px-8">
+          <header className="grid gap-4">
+            <span className="font-mono text-[12.5px] text-acc">/blog</span>
+            <h1 className="font-display text-[clamp(3rem,9vw,6rem)] leading-[0.9] font-extrabold tracking-[-0.055em]">
+              {DATA.writing.title}
+            </h1>
+            <p className="max-w-[52ch] text-[clamp(1.1rem,2vw,1.35rem)] leading-snug tracking-tight text-fog">
+              {DATA.writing.description}
             </p>
-          </div>
-              )}
-    </section>
+          </header>
+
+          {posts.length === 0 ? (
+            <p className="mt-14 rounded-2xl border border-dashed border-line px-6 py-10 text-center font-mono text-[13px] text-dim">
+              Nothing published yet.
+            </p>
+          ) : (
+            <ol className="mt-14 grid border-t border-line">
+              {posts.map((post, i) => (
+                <Reveal as="li" key={post.slug} delay={Math.min(i, 6) * 0.05}>
+                  <Link
+                    href={`/blog/${post.slug}`}
+                    className="group grid gap-2 border-b border-line py-6 sm:grid-cols-[9rem_1fr] sm:gap-8"
+                  >
+                    <time dateTime={post.date} className="pt-1 font-mono text-[12.5px] text-dim">
+                      {formatPostDate(post.date)}
+                    </time>
+                    <span className="grid gap-1.5">
+                      <span className="font-display text-[clamp(1.35rem,2.6vw,1.8rem)] leading-tight font-bold tracking-[-0.03em] transition-colors group-hover:text-acc">
+                        {post.title}
+                      </span>
+                      <span className="max-w-[64ch] text-[15.5px] leading-relaxed text-fog">{post.summary}</span>
+                    </span>
+                  </Link>
+                </Reveal>
+              ))}
+            </ol>
+          )}
+        </div>
+      </main>
+      <Footer updated={UPDATED} />
+    </>
   );
 }

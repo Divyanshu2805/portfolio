@@ -7,7 +7,7 @@
 @custom-variant can-hover (@media (hover: hover) and (pointer: fine));
 
 /*
- * Design tokens, see docs/design-plan.md ("Live build").
+ * Design tokens.
  * The site is graphite and nearly colourless; colour comes from the work.
  * --acc is the live accent: it follows the project in view (AccentSpy) and
  * transitions because it is a registered <color> property.
@@ -41,26 +41,6 @@
   --acc: var(--c-ion);
   --shadow: 0 1px 2px rgb(18 19 23 / 0.05), 0 22px 48px -22px rgb(18 19 23 / 0.28);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
-
-  /* shadcn semantic mapping, for ui/ primitives */
-  --background: var(--bg);
-  --foreground: var(--ink);
-  --primary: var(--ink);
-  --primary-foreground: var(--bg);
-  --secondary: var(--panel-2);
-  --secondary-foreground: var(--ink);
-  --muted: var(--panel-2);
-  --muted-foreground: var(--fog);
-  --accent: var(--panel-2);
-  --accent-foreground: var(--ink);
-  --destructive: var(--bad);
-  --border: var(--line);
-  --input: var(--line);
-  --ring: var(--acc);
-  --card: var(--panel);
-  --card-foreground: var(--ink);
-  --popover: var(--panel);
-  --popover-foreground: var(--ink);
 
   color-scheme: light;
 }
@@ -123,25 +103,6 @@
   --color-ok: var(--ok);
   --color-bad: var(--bad);
   --color-acc: var(--acc);
-
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
 
   --font-display: var(--font-bricolage), "Arial Narrow", ui-sans-serif, sans-serif;
   --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;

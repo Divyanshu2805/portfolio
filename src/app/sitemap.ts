@@ -1,7 +1,7 @@
 import { BUILD_LOGS } from "@/data/build-logs";
 import { DATA } from "@/data/resume";
+import { posts } from "@/lib/posts";
 import { SITE_URL } from "@/lib/site";
-import { allPosts } from "content-collections";
 import type { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -13,11 +13,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   if (DATA.writing.enabled) {
     pages.push({ url: `${SITE_URL}/blog`, changeFrequency: "weekly" });
-    for (const post of allPosts) {
-      pages.push({
-        url: `${SITE_URL}/blog/${post._meta.path.replace(/\.mdx$/, "")}`,
-        lastModified: post.updatedAt ?? post.publishedAt,
-      });
+    for (const post of posts) {
+      pages.push({ url: `${SITE_URL}/blog/${post.slug}`, lastModified: post.date });
     }
   }
 

@@ -2,33 +2,23 @@ import { defineCollection, defineConfig } from "@content-collections/core";
 import { compileMDX } from "@content-collections/mdx";
 import remarkGfm from "remark-gfm";
 import { z } from "zod";
-import { remarkCodeMeta } from "./src/lib/remark-code-meta";
 
+/** Blog posts: one .mdx file per post in /content; the file name is the slug. */
 const posts = defineCollection({
-    name: "posts",
-    directory: "content",
-    include: "**/*.mdx",
-    schema: z.object({
-        title: z.string(),
-        publishedAt: z.string(),
-        updatedAt: z.string().optional(),
-        author: z.string().optional(),
-        summary: z.string(),
-        image: z.string().optional(),
-        content: z.string(),
-    }),
-    transform: async (document, context) => {
-        const mdx = await compileMDX(context, document, {
-            remarkPlugins: [remarkGfm, remarkCodeMeta],
-        });
-        return {
-        ...document,
-            mdx,
-        };
-    },
+  name: "posts",
+  directory: "content",
+  include: "*.mdx",
+  schema: z.object({
+    title: z.string(),
+    date: z.string(),
+    summary: z.string(),
+    content: z.string(),
+  }),
+  transform: async (post, context) => ({
+    ...post,
+    slug: post._meta.path,
+    body: await compileMDX(context, post, { remarkPlugins: [remarkGfm] }),
+  }),
 });
 
-export default defineConfig({
-    collections: [posts],
-});
-
+export default defineConfig({ collections: [posts] });

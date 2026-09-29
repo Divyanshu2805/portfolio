@@ -3,12 +3,12 @@ import { AccentSpy } from "@/components/site/accent-spy";
 import { CommandPalette } from "@/components/site/command-palette";
 import { SmoothScroll } from "@/components/site/smooth-scroll";
 import { TopNav } from "@/components/site/top-nav";
-import { ThemeProvider } from "@/components/theme-provider";
 import { DATA } from "@/data/resume";
 import { SITE_URL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Geist, JetBrains_Mono } from "next/font/google";
+import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
 /** Display: characterful at large sizes, tight at 800. */
